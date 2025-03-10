@@ -1,29 +1,58 @@
--- Retrieve the names of all restaurants offering a specific cuisine (e.g., Italian)
-SELECT name FROM restaurants WHERE cuisine = 'Italian';
+-- Step 1: Populate the database with sample data
 
--- Add a new customer to the database with their details
-INSERT INTO customers (name, email, phone, address) VALUES ('John Doe', 'johndoe@example.com', '1234567890', '123 Main St');
+INSERT INTO Books (book_id, title, author, isbn, publication_year, genre)
+VALUES
+(1, 'The Great Gatsby', 'F. Scott Fitzgerald', '9780743273565', 1925, 'Fiction'),
+(2, 'To Kill a Mockingbird', 'Harper Lee', '9780061120084', 1960, 'Fiction'),
+(3, '1984', 'George Orwell', '9780451524935', 1949, 'Dystopian'),
+(4, 'Moby Dick', 'Herman Melville', '9781503280786', 1851, 'Adventure');
 
--- Update the price of a particular dish in a specific restaurant
-UPDATE dishes SET price = 15.99 WHERE name = 'Pasta Carbonara' AND restaurant_id = 1;
+INSERT INTO Borrowers (borrower_id, name, contact_info, membership_date)
+VALUES
+(1, 'Alice Johnson', 'alice@example.com', '2023-01-15'),
+(2, 'Bob Smith', 'bob@example.com', '2023-02-20');
 
--- Remove a dish from the menu if it's marked as unavailable
-DELETE FROM dishes WHERE available = false;
+INSERT INTO Loans (loan_id, book_id, borrower_id, loan_date, due_date, return_date)
+VALUES
+(1, 1, 1, '2024-03-01', '2024-03-15', NULL),
+(2, 2, 2, '2024-03-05', '2024-03-19', '2024-03-18');
 
--- Display the customer who has placed the highest number of orders
-SELECT customer_id, COUNT(*) AS order_count FROM orders GROUP BY customer_id ORDER BY order_count DESC LIMIT 1;
+-- Step 2: Retrieve a list of all overdue books
+SELECT b.title, br.name, l.due_date
+FROM Loans l
+JOIN Books b ON l.book_id = b.book_id
+JOIN Borrowers br ON l.borrower_id = br.borrower_id
+WHERE l.due_date < CURRENT_DATE AND l.return_date IS NULL;
 
--- For each cuisine type, calculate the average price of dishes
-SELECT cuisine, AVG(price) AS average_price FROM dishes JOIN restaurants ON dishes.restaurant_id = restaurants.id GROUP BY cuisine;
+-- Step 3: Generate a report on most popular book genres
+SELECT b.genre, COUNT(l.loan_id) AS loan_count
+FROM Loans l
+JOIN Books b ON l.book_id = b.book_id
+GROUP BY b.genre
+ORDER BY loan_count DESC;
 
--- Retrieve the top 5 most popular dishes based on the number of times they were ordered
-SELECT dish_id, COUNT(*) AS order_count FROM order_items GROUP BY dish_id ORDER BY order_count DESC LIMIT 5;
+-- Step 4: Identify top borrowers
+SELECT br.name, COUNT(l.loan_id) AS total_loans
+FROM Loans l
+JOIN Borrowers br ON l.borrower_id = br.borrower_id
+GROUP BY br.name
+ORDER BY total_loans DESC
+LIMIT 5;
 
--- Identify customers who haven't placed an order in the last month
-SELECT * FROM customers WHERE id NOT IN (SELECT DISTINCT customer_id FROM orders WHERE order_date >= NOW() - INTERVAL '1 month');
+-- Step 5: Search books by keyword
+SELECT * FROM Books
+WHERE title LIKE '%keyword%' OR author LIKE '%keyword%';
 
--- Find restaurants that offer dishes priced above the average price for their cuisine type
-SELECT DISTINCT r.name FROM restaurants r JOIN dishes d ON r.id = d.restaurant_id WHERE d.price > (SELECT AVG(d2.price) FROM dishes d2 WHERE d2.restaurant_id = r.id);
+-- Step 6: Create a view for borrower profile
+CREATE VIEW BorrowerProfile AS
+SELECT br.borrower_id, br.name, br.contact_info, br.membership_date, b.title AS borrowed_book, l.loan_date, l.return_date
+FROM Borrowers br
+LEFT JOIN Loans l ON br.borrower_id = l.borrower_id
+LEFT JOIN Books b ON l.book_id = b.book_id;
 
--- Display the order details for a given order ID, including customer information and ordered items
-SELECT o.id AS order_id, c.name AS customer_name, c.email, c.phone, c.address, d.name AS dish_name, d.price FROM orders o JOIN customers c ON o.customer_id = c.id JOIN order_items oi ON o.id = oi.order_id JOIN dishes d ON oi.dish_id = d.id WHERE o.id = ?;
+-- Step 7: Update book availability
+UPDATE Books
+SET availability = CASE 
+    WHEN book_id IN (SELECT book_id FROM Loans WHERE return_date IS NULL) THEN 'Not Available'
+    ELSE 'Available'
+END;
